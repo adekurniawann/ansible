@@ -1,0 +1,128 @@
+---
+- name: update server and install docker
+  hosts: development
+  become: true
+  tasks:
+
+    - name: Set configured port fact
+      set_fact:
+        configured_port: "xxxxx"
+    
+    - name: Setup alternate SSH port
+      lineinfile:
+        dest: "/etc/ssh/sshd_config"
+        regexp: "^Port"
+        line: "Port {{ configured_port }}"
+
+    - name: enable PAM
+      lineinfile:
+        dest: "/etc/ssh/sshd_config"
+        regexp: "^UsePAM"
+        line: "UsePAM yes"
+
+    - name: Ensure SSH is reloaded if need be
+      meta: flush_handlers
+
+    - name: Add Docker GPG apt Key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker Repository
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu focal stable
+        state: present
+
+    - name: Update apt and install docker-ce
+      apt:
+        name: docker-ce
+        state: latest
+        update_cache: true
+
+    - name: add user xxxxx to docker group  
+      ansible.builtin.user:
+        name: xxxxx
+        shell: /bin/bash
+        groups: sudo
+        append: yes
+
+    - name: setup user xxxxx for no password sudo
+      lineinfile:
+        dest: "/etc/sudoers"
+        regexp: "^xxxxx"
+        line: "xxxxx ALL=(ALL) NOPASSWD:ALL"
+
+    - name: reset ssh connection to allow user changes to affect ansible user
+      ansible.builtin.meta:
+        reset_connection
+
+    - name: disable password authentication
+      lineinfile:
+        dest: "/etc/ssh/sshd_config"
+        regexp: "^PasswordAuthentication"
+        line: "PasswordAuthentication no"
+
+    - name: disable root login
+      lineinfile:
+        dest: "/etc/ssh/sshd_config"
+        regexp: "^PermitRootLogin"
+        line: "PermitRootLogin no"
+
+    - name: disable empty password 
+      lineinfile:
+        dest: "/etc/ssh/sshd_config"
+        regexp: "^PermitEmptyPasswords"
+        line: "PermitEmptyPasswords no"
+
+    - name: disable X11Forwarding
+      lineinfile:
+        dest: "/etc/ssh/sshd_config"
+        regexp: "^X11Forwarding"
+        line: "X11Forwarding no"
+
+    - name: set SSH ClientAliveInterval
+      lineinfile:
+        dest: "/etc/ssh/sshd_config"
+        regexp: "^ClientAliveInterval"
+        line: "ClientAliveInterval 300"
+
+    - name: set SSH ClientAliveInterval
+      lineinfile:
+        dest: "/etc/ssh/sshd_config"
+        regexp: "^ClientAliveCountMax"
+        line: "ClientAliveCountMax 2"
+
+    - name: set SSH MaxAuthTries
+      lineinfile:
+        dest: "/etc/ssh/sshd_config"
+        regexp: "^MaxAuthTries"
+        line: "MaxAuthTries 3"
+
+    - name: set SSH MaxSessions
+      lineinfile:
+        dest: "/etc/ssh/sshd_config"
+        regexp: "^ClientAliveCountMax"
+        line: "MaxSessions 5"
+    
+    - name: Set authorized key for user xxxxx copying it from current user
+      authorized_key:
+        user: xxxxx
+        state: present
+        key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/id_rsa.pub') }}"
+
+    - name: create docker network for portainer if it doesnt exist
+      ansible.builtin.shell:
+        cmd: sudo timedatectl set-timezone Asia/Jakarta
+
+    - name: restart sshd
+      service:
+        name: sshd
+        state: restarted
+
+    - name: reset ssh connection to allow user changes to affect ansible user
+      ansible.builtin.meta:
+        reset_connection
+
+    - name: Ensure we use the configured SSH port for the remainder of the role
+      set_fact:
+        ansible_port: "{{ configured_port }}"

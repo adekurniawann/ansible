@@ -1,0 +1,17 @@
+---
+  - name: restart_service
+    hosts: development
+    tasks:
+
+    - name: cronjob shell script for docker prune on a remote server
+      copy:
+          src: cronjob/restartservice.sh
+          dest: ~/cronjob/
+          mode: u+x,o+x
+      
+    - name: add the cronjob for docker prune
+      ansible.builtin.cron:
+          name: "docker daily image prune"
+          minute: "0"
+          hour: "4"
+          job: "~/cronjob/restartservice.sh"

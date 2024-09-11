@@ -1,0 +1,53 @@
+---
+  - name: post setup for new instance installation 
+    hosts: development
+    tasks:
+
+      - name: start docker swarm
+        ansible.builtin.shell:
+          cmd: docker swarm init
+
+      - name: create docker network public for portainer if it doesnt exist
+        ansible.builtin.shell:
+          cmd: docker network create --driver overlay --attachable public
+
+      - name: create docker network portainer_agent_network for portainer if it doesnt exist
+        ansible.builtin.shell:
+          cmd: docker network create --driver overlay portainer_agent_network
+
+      - name: run portainer agent if it hasnt
+        ansible.builtin.shell:
+          cmd: docker service create --name portainer_agent --network portainer_agent_network -p 9001:9001/tcp --mode global --constraint 'node.platform.os == linux' --mount type=bind,src=//var/run/docker.sock,dst=/var/run/docker.sock --mount type=bind,src=//var/lib/docker/volumes,dst=/var/lib/docker/volumes portainer/agent:2.16.2
+      
+      - name: cronjob shell script for docker prune on a remote server
+        copy:
+          src: cronjob/dockerprune.sh
+          dest: ~/cronjob/
+          mode: u+x,o+x
+      
+      - name: add the cronjob for docker prune
+        ansible.builtin.cron:
+          name: "docker daily image prune"
+          minute: "0"
+          hour: "2"
+          job: "~/cronjob/dockerprune.sh"
+
+      - name: Ensure group "dd-agent" exists
+        ansible.builtin.group:
+          name: dd-agent
+          state: present
+
+      - name: add user dd-agent to dd-agent group  
+        ansible.builtin.user:
+          name: dd-agent
+          shell: /bin/bash
+          groups: dd-agent
+          append: yes
+    
+      - name: Create a directory if it does not exist
+        ansible.builtin.file:
+          path: /opt/datadog-agent/run
+          state: directory
+          owner: dd-agent
+          group: dd-agent
+          mode: '0755'

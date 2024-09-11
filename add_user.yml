@@ -1,0 +1,18 @@
+---
+- name: add user to docker group
+  hosts: development
+  become: true
+  tasks:
+
+    - name: add user xxxx to docker group  
+      ansible.builtin.user:
+        name: xxxx
+        shell: /bin/bash
+        groups: docker
+        append: yes
+
+    - name: Set authorized key for user xxxx copying it from current user
+      authorized_key:
+        user: xxxx
+        state: present
+        key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/id.pub') }}"
