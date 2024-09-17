@@ -1,4 +1,4 @@
-[flexy_staging] 
+[staging] 
 ip_xxxx ansible_user=user_xxxx ansible_port=port_xxxx
 
 [production] 
