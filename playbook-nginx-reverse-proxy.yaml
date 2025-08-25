@@ -1,0 +1,81 @@
+---
+- name: Install and configure Nginx reverse proxy on Ubuntu
+  hosts: all
+  become: true
+  vars:
+    nginx_config_file: "/etc/nginx/sites-available/custom_site"
+    nginx_config_symlink: "/etc/nginx/sites-enabled/custom_site"
+    nginx_root: "/var/www/custom_site"
+    server_name: "example.com"
+    backend_url: "http://127.0.0.1:3000"
+
+  tasks:
+    # Update apt cache
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    # Install Nginx
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+
+    # Create a root directory for static content
+    - name: Create Nginx root directory
+      file:
+        path: "{{ nginx_root }}"
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: '0755'
+
+    # Create a simple index.html for testing
+    - name: Create index.html
+      copy:
+        dest: "{{ nginx_root }}/index.html"
+        content: |
+          <html>
+          <head><title>Welcome to Nginx Reverse Proxy</title></head>
+          <body>
+              <h1>Reverse Proxy for {{ server_name }}</h1>
+              <p>Backend: {{ backend_url }}</p>
+          </body>
+          </html>
+
+    # Create Nginx reverse proxy config from template
+    - name: Create Nginx reverse proxy config
+      template:
+        src: nginx_site.j2
+        dest: "{{ nginx_config_file }}"
+      notify: Reload Nginx
+
+    # Enable the custom site
+    - name: Enable Nginx site
+      file:
+        src: "{{ nginx_config_file }}"
+        dest: "{{ nginx_config_symlink }}"
+        state: link
+      notify: Reload Nginx
+
+    # Remove default site if exists
+    - name: Remove default Nginx configuration
+      file:
+        path: "/etc/nginx/sites-enabled/default"
+        state: absent
+      notify: Reload Nginx
+
+    # Test Nginx configuration
+    - name: Test Nginx configuration
+      command: nginx -t -q
+      register: nginx_test
+      changed_when: false
+      failed_when: nginx_test.rc != 0
+
+  handlers:
+    - name: Reload Nginx
+      service:
+        name: nginx
+        state: reloaded
+        enabled: yes
